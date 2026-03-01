@@ -3,7 +3,6 @@ import { Button, Box } from "@mui/material";
 import { useForm, useWatch, useFormState } from "react-hook-form";
 import { PersonAdd } from "@mui/icons-material";
 import { CippOffCanvas } from "./CippOffCanvas";
-import { CippFormUserSelector } from "./CippFormUserSelector";
 import { CippApiResults } from "./CippApiResults";
 import { useSettings } from "../../hooks/use-settings";
 import { ApiPostCall } from "../../api/ApiCall";
@@ -19,7 +18,7 @@ export const CippAddUserDrawer = ({
   const userSettingsDefaults = useSettings();
 
   const formControl = useForm({
-    mode: "onBlur",
+    mode: "onChange",
     defaultValues: {
       tenantFilter: userSettingsDefaults.currentTenant,
       usageLocation: userSettingsDefaults.usageLocation,
@@ -53,22 +52,36 @@ export const CippAddUserDrawer = ({
       }
       newFields.tenantFilter = userSettingsDefaults.currentTenant;
 
+      // Preserve the currently selected template when copying properties
+      const currentTemplate = formControl.getValues("userTemplate");
+      if (currentTemplate) {
+        newFields.userTemplate = currentTemplate;
+      }
+
       formControl.reset(newFields);
     }
   }, [formValues]);
 
   useEffect(() => {
     if (createUser.isSuccess) {
-      formControl.reset({
+      const resetValues = {
         tenantFilter: userSettingsDefaults.currentTenant,
         usageLocation: userSettingsDefaults.usageLocation,
-      });
+      };
+
+      // Preserve the default template if it exists
+      const currentTemplate = formControl.getValues("userTemplate");
+      if (currentTemplate?.addedFields?.defaultForTenant) {
+        resetValues.userTemplate = currentTemplate;
+      }
+
+      formControl.reset(resetValues);
     }
   }, [createUser.isSuccess]);
 
-  const handleSubmit = () => {
-    formControl.trigger();
-    if (!isValid) {
+  const handleSubmit = async () => {
+    const isFormValid = await formControl.trigger();
+    if (!isFormValid) {
       return;
     }
     const values = formControl.getValues();
@@ -85,17 +98,40 @@ export const CippAddUserDrawer = ({
 
   const handleCloseDrawer = () => {
     setDrawerVisible(false);
-    formControl.reset({
+    const resetValues = {
       tenantFilter: userSettingsDefaults.currentTenant,
       usageLocation: userSettingsDefaults.usageLocation,
-    });
+    };
+
+    // Preserve the default template if it exists
+    const currentTemplate = formControl.getValues("userTemplate");
+    if (currentTemplate?.addedFields?.defaultForTenant) {
+      resetValues.userTemplate = currentTemplate;
+    }
+
+    formControl.reset(resetValues);
+  };
+
+  const handleOpenDrawer = () => {
+    const resetValues = {
+      tenantFilter: userSettingsDefaults.currentTenant,
+      usageLocation: userSettingsDefaults.usageLocation,
+    };
+
+    const currentTemplate = formControl.getValues("userTemplate");
+    if (currentTemplate?.addedFields?.defaultForTenant) {
+      resetValues.userTemplate = currentTemplate;
+    }
+
+    formControl.reset(resetValues);
+    setDrawerVisible(true);
   };
 
   return (
     <>
       <PermissionButton
         requiredPermissions={requiredPermissions}
-        onClick={() => setDrawerVisible(true)}
+        onClick={handleOpenDrawer}
         startIcon={<PersonAdd />}
       >
         {buttonText}
@@ -118,8 +154,8 @@ export const CippAddUserDrawer = ({
                 {createUser.isPending
                   ? "Creating User..."
                   : createUser.isSuccess
-                  ? "Create Another User"
-                  : "Create User"}
+                    ? "Create Another User"
+                    : "Create User"}
               </Button>
               <Button variant="outlined" onClick={handleCloseDrawer}>
                 Close
